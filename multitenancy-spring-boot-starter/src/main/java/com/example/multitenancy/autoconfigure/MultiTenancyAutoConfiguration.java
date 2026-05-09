@@ -1,7 +1,10 @@
 package com.example.multitenancy.autoconfigure;
 
+import com.example.multitenancy.HeaderTenantResolver;
 import com.example.multitenancy.TenantAwareRoutingDataSource;
 import com.example.multitenancy.TenantInterceptor;
+import com.example.multitenancy.TenantResolver;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -62,11 +65,17 @@ public class MultiTenancyAutoConfiguration {
 
 
     @Bean
-    public TenantInterceptor tenantInterceptor() {
+    @ConditionalOnMissingBean
+    public TenantResolver tenantResolver() {
+        return new HeaderTenantResolver();
+    }
+
+    @Bean
+    public TenantInterceptor tenantInterceptor(TenantResolver tenantResolver) {
         java.util.Set<String> tenantIds = properties.getTenants().stream()
                 .map(MultiTenancyProperties.TenantProperties::getId)
                 .collect(java.util.stream.Collectors.toSet());
-        return new TenantInterceptor(tenantIds);
+        return new TenantInterceptor(tenantResolver, tenantIds);
     }
 
     @Bean

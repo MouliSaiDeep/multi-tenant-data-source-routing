@@ -12,16 +12,17 @@ import java.util.Set;
  */
 public class TenantInterceptor implements HandlerInterceptor {
 
-    private static final String TENANT_HEADER = "X-Tenant-ID";
+    private final TenantResolver tenantResolver;
     private final Set<String> allowedTenants;
 
-    public TenantInterceptor(Set<String> allowedTenants) {
+    public TenantInterceptor(TenantResolver tenantResolver, Set<String> allowedTenants) {
+        this.tenantResolver = tenantResolver;
         this.allowedTenants = allowedTenants;
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        String tenantId = request.getHeader(TENANT_HEADER);
+        String tenantId = tenantResolver.resolveTenantId(request);
         
         if (tenantId == null || tenantId.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
