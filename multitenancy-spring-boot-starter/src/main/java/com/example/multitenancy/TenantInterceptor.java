@@ -33,7 +33,8 @@ public class TenantInterceptor implements HandlerInterceptor {
         if (!allowedTenants.contains(tenantId)) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Not Found\", \"message\": \"Tenant not found: " + tenantId + "\"}");
+            String safeTenantId = tenantId.replace("\\", "\\\\").replace("\"", "\\\"");
+            response.getWriter().write("{\"error\": \"Not Found\", \"message\": \"Tenant not found: " + safeTenantId + "\"}");
             return false;
         }
 

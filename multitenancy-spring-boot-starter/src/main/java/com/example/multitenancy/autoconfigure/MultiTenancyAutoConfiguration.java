@@ -20,7 +20,7 @@ import java.util.Map;
 @Configuration
 @EnableConfigurationProperties(MultiTenancyProperties.class)
 @ConditionalOnProperty(prefix = "multitenancy", name = "enabled", havingValue = "true")
-public class MultiTenancyAutoConfiguration implements WebMvcConfigurer {
+public class MultiTenancyAutoConfiguration {
 
     private final MultiTenancyProperties properties;
 
@@ -69,9 +69,14 @@ public class MultiTenancyAutoConfiguration implements WebMvcConfigurer {
         return new TenantInterceptor(tenantIds);
     }
 
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(tenantInterceptor())
-                .addPathPatterns("/api/**"); // Apply to API endpoints
+    @Bean
+    public WebMvcConfigurer tenantWebMvcConfigurer(TenantInterceptor tenantInterceptor) {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(tenantInterceptor)
+                        .addPathPatterns("/api/**");
+            }
+        };
     }
 }

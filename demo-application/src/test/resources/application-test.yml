@@ -1,0 +1,30 @@
+multitenancy:
+  enabled: true
+  tenants:
+    - id: tenant1
+      url: jdbc:h2:mem:tenant1;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE);
+      username: sa
+      password: password
+      driver-class-name: org.h2.Driver
+    - id: tenant2
+      url: jdbc:h2:mem:tenant2;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(255), email VARCHAR(255) UNIQUE);
+      username: sa
+      password: password
+      driver-class-name: org.h2.Driver
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none # We use INIT in the JDBC URL to create tables
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+      group:
+        datasources:
+          include: tenantDb
