@@ -1,0 +1,516 @@
+{
+	"info": {
+		"_postman_id": "7a942cf7-ee2f-41f2-b7e5-1845bb08f0a0",
+		"name": "Multi-Tenant DataSource Routing API",
+		"description": "# Multi-Tenant DataSource Routing API\n\nThis collection contains all endpoints for testing the Multi-Tenant DataSource Routing Spring Boot application.\n\n### Architectural Design:\n- **Datasource Routing**: Requests to `/api/**` require the `X-Tenant-ID` header. Based on this header, the application dynamically routes JPA/Hibernate transactions to the respective PostgreSQL databases (`tenant1_db`, `tenant2_db`, or `tenant3_db`).\n- **Health Monitoring**: Actuator exposes a composite health contributor (`tenantDbHealthContributor`) that monitors the status of each configured tenant database independently.\n- **Error Handling**: Missing header returns `400 Bad Request`, and invalid tenant ID returns `404 Not Found`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Actuator Health Checks",
+			"description": "System monitoring and tenant database health status endpoints.",
+			"item": [
+				{
+					"name": "Overall Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Overall application status is UP\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"UP\");",
+									"});",
+									"",
+									"pm.test(\"Tenant database health components exist\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.components).to.have.property(\"tenantDbHealthContributor\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/actuator/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"actuator",
+								"health"
+							]
+						},
+						"description": "Retrieves the overall health of the application. The response includes status details for all individual tenant data sources (`tenantDbHealthContributor`)."
+					},
+					"response": []
+				},
+				{
+					"name": "Datasources Health Group",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"All configured tenant databases are UP\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"UP\");",
+									"    pm.expect(jsonData.components).to.have.property(\"tenantDbHealthContributor\");",
+									"    var tenantDbs = jsonData.components.tenantDbHealthContributor.components;",
+									"    pm.expect(tenantDbs).to.have.property(\"tenant1\");",
+									"    pm.expect(tenantDbs).to.have.property(\"tenant2\");",
+									"    pm.expect(tenantDbs).to.have.property(\"tenant3\");",
+									"    pm.expect(tenantDbs.tenant1.status).to.eql(\"UP\");",
+									"    pm.expect(tenantDbs.tenant2.status).to.eql(\"UP\");",
+									"    pm.expect(tenantDbs.tenant3.status).to.eql(\"UP\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/actuator/health/datasources",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"actuator",
+								"health",
+								"datasources"
+							]
+						},
+						"description": "Retrieves health status specifically for the database datasources group, showcasing detailed connection status of `tenant1`, `tenant2`, and `tenant3`."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users API",
+			"description": "User CRUD endpoints demonstrating header-based multi-tenant routing.",
+			"item": [
+				{
+					"name": "Create User (Dynamic Tenant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"User was successfully created and has an ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.id).to.be.a('number');",
+									"    pm.expect(jsonData.name).to.eql(\"Alice Developer\");",
+									"    pm.expect(jsonData.email).to.eql(\"alice@tenant1.com\");",
+									"    ",
+									"    // Automatically save the created user ID in collection variable for subsequent requests",
+									"    pm.collectionVariables.set(\"createdUserId\", jsonData.id);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenantId}}",
+								"type": "text",
+								"description": "The tenant identifier used to route the transaction to the correct database (e.g. tenant1, tenant2, tenant3)."
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Alice Developer\",\n    \"email\": \"alice@tenant1.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Creates a new user inside the database corresponding to the specified `X-Tenant-ID` header."
+					},
+					"response": []
+				},
+				{
+					"name": "Create User (Explicit Tenant 2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"User was successfully created in Tenant 2\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.id).to.be.a('number');",
+									"    pm.expect(jsonData.name).to.eql(\"Bob Admin\");",
+									"    pm.expect(jsonData.email).to.eql(\"bob@tenant2.com\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "tenant2",
+								"type": "text",
+								"description": "Specifically target tenant2 database"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Bob Admin\",\n    \"email\": \"bob@tenant2.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Creates a new user inside the `tenant2` database, demonstrating that data isolation remains completely separated from `tenant1` and `tenant3`."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Users (Dynamic Tenant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is a list of users\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenantId}}",
+								"type": "text",
+								"description": "Route data retrieval to correct tenant database."
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Retrieves all users belonging to the tenant specified in the `X-Tenant-ID` header. Demonstrates strict data isolation between tenants."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User By ID (Dynamic Tenant)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Returned user matches the created user id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.id).to.eql(Number(pm.collectionVariables.get(\"createdUserId\")));",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenantId}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/{{createdUserId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"{{createdUserId}}"
+							]
+						},
+						"description": "Fetches a specific user by their ID from the currently selected tenant's database."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Error Scenarios",
+			"description": "Requests simulating failure modes and error handling logic.",
+			"item": [
+				{
+					"name": "Create User - Missing Header",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Response contains proper bad request error payload\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.error).to.eql(\"Bad Request\");",
+									"    pm.expect(jsonData.message).to.eql(\"X-Tenant-ID header is missing\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Jane Missing Header\",\n    \"email\": \"jane.missing@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Simulates a client sending a request without the required `X-Tenant-ID` header. Demonstrates that the `TenantInterceptor` rejects the request with a standard `400 Bad Request` and descriptive error payload."
+					},
+					"response": []
+				},
+				{
+					"name": "Create User - Invalid Tenant ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404 Not Found\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									"",
+									"pm.test(\"Response contains proper tenant not found payload\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.error).to.eql(\"Not Found\");",
+									"    pm.expect(jsonData.message).to.eql(\"Tenant not found: unknown-tenant\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "unknown-tenant",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Unknown Tenant User\",\n    \"email\": \"unknown@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Simulates a client passing an unrecognized tenant ID in the `X-Tenant-ID` header. Shows that the application safely denies access with a `404 Not Found` response."
+					},
+					"response": []
+				},
+				{
+					"name": "Create User - Invalid Input Body",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenantId}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"\",\n    \"email\": \"invalid-email-format\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"users"
+							]
+						},
+						"description": "Simulates validation failure by sending empty name and invalid email pattern. The API will respond with `400 Bad Request` and standard validation error responses."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "tenantId",
+			"value": "tenant1",
+			"type": "string"
+		},
+		{
+			"key": "createdUserId",
+			"value": "1",
+			"type": "string"
+		}
+	]
+}
