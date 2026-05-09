@@ -35,5 +35,5 @@ management:
       show-details: always
       group:
         datasources:
-          include: tenantDb
+          include: tenantDbHealthContributor
           show-components: always

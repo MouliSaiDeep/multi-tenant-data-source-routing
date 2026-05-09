@@ -88,4 +88,15 @@ public class MultiTenancyAutoConfiguration {
             }
         };
     }
+
+    @Configuration(proxyBeanMethods = false)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnClass(org.springframework.boot.actuate.health.HealthContributor.class)
+    protected static class TenantHealthConfiguration {
+
+        @Bean("tenantDbHealthContributorHealthContributor")
+        public TenantHealthContributor tenantDbHealthContributor(Map<Object, Object> tenantDataSources) {
+            return new TenantHealthContributor(tenantDataSources);
+        }
+    }
 }
+
