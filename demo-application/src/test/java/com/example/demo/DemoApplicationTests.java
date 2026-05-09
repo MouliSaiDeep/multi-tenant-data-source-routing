@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 public class DemoApplicationTests {
 
     @Autowired
@@ -87,5 +89,30 @@ public class DemoApplicationTests {
         ResponseEntity<String> response = restTemplate.exchange("/api/users", HttpMethod.GET, request, String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).contains("Tenant not found: invalid-tenant");
+    }
+
+    @Test
+    public void testTenantDataCannotBeAccessedByAnotherTenant() {
+        // 1. Create a user in tenant1
+        HttpHeaders headers1 = new HttpHeaders();
+        headers1.set("X-Tenant-ID", "tenant1");
+        headers1.set("Content-Type", "application/json");
+
+        User user1 = new User();
+        user1.setName("Secret User");
+        user1.setEmail("secret@tenant1.com");
+
+        HttpEntity<User> request1 = new HttpEntity<>(user1, headers1);
+        ResponseEntity<User> response1 = restTemplate.postForEntity("/api/users", request1, User.class);
+        assertThat(response1.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Long userId = response1.getBody().getId();
+
+        // 2. Query the user using tenant2
+        HttpHeaders headers2 = new HttpHeaders();
+        headers2.set("X-Tenant-ID", "tenant2");
+        HttpEntity<Void> request2 = new HttpEntity<>(headers2);
+
+        ResponseEntity<User> response2 = restTemplate.exchange("/api/users/" + userId, HttpMethod.GET, request2, User.class);
+        assertThat(response2.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

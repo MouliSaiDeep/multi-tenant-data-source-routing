@@ -36,3 +36,4 @@ management:
       group:
         datasources:
           include: tenantDb
+          show-components: always
